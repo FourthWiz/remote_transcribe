@@ -1,0 +1,7 @@
+.workflow_artifacts/
+.venv/
+__pycache__/
+*.pyc
+logs/
+config.env
+.DS_Store
