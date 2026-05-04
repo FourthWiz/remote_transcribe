@@ -68,7 +68,10 @@ def _load_config() -> dict:
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 key, _, value = line.partition("=")
-                cfg[key.strip()] = value.strip()
+                v = value.strip()
+                if len(v) >= 2 and v[0] == v[-1] and v[0] in ('"', "'"):
+                    v = v[1:-1]
+                cfg[key.strip()] = v
     return cfg
 
 
