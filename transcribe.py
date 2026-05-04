@@ -516,6 +516,20 @@ def write_transcript(
     return note_path
 
 
+def sync_copy_dir(notes_dir: Path, copy_dir: Path | None) -> int:
+    """Copy every .md in notes_dir to copy_dir if absent or older there."""
+    if copy_dir is None:
+        return 0
+    copy_dir.mkdir(parents=True, exist_ok=True)
+    copied = 0
+    for src in sorted(notes_dir.glob("*.md")):
+        dst = copy_dir / src.name
+        if not dst.exists() or src.stat().st_mtime > dst.stat().st_mtime:
+            shutil.copy2(src, dst)
+            copied += 1
+    return copied
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -621,6 +635,9 @@ def main() -> None:
     print(f"Failed:     {failed} file(s)")
     print(f"Total time: {format_duration(total_elapsed)}")
     print(f"Output:     {config['notes_dir']}")
+
+    synced = sync_copy_dir(config["notes_dir"], COPY_DIR)
+    print(f"Synced:     {synced} file(s) to COPY_DIR")
 
 
 if __name__ == "__main__":

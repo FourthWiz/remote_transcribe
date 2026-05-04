@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run_daily.sh — called by cron to transcribe yesterday's meetings.
+# run_daily.sh — called by cron to transcribe all pending meetings.
 # Logs to <script_dir>/logs/transcribe.log
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -19,12 +19,10 @@ if [ -z "$HF_TOKEN" ] && [ -f "$HOME/.zshrc" ]; then
     HF_TOKEN=$(grep 'export HF_TOKEN=' "$HOME/.zshrc" | tail -1 | sed 's/export HF_TOKEN=//' | tr -d '"'"'" 2>/dev/null)
 fi
 
-YESTERDAY=$(date -v-1d +%Y-%m-%d)
-
 echo "" >> "$LOG_FILE"
-echo "=== $(date '+%Y-%m-%d %H:%M:%S') — transcribing $YESTERDAY ===" >> "$LOG_FILE"
+echo "=== $(date '+%Y-%m-%d %H:%M:%S') — transcribing all pending ===" >> "$LOG_FILE"
 
-"$PYTHON" "$SCRIPT_DIR/transcribe.py" --date "$YESTERDAY" >> "$LOG_FILE" 2>&1
+"$PYTHON" "$SCRIPT_DIR/transcribe.py" --all >> "$LOG_FILE" 2>&1
 EXIT=$?
 
 if [ $EXIT -eq 0 ]; then
