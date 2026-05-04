@@ -550,6 +550,8 @@ def main() -> None:
     all_files = discover_files(config["meetings_dir"], target_date, process_all=args.all)
     if not all_files:
         print("No recordings found. Nothing to do.")
+        synced = sync_copy_dir(config["notes_dir"], COPY_DIR)
+        print(f"Synced:     {synced} file(s) to COPY_DIR")
         return
 
     # Apply skip logic
@@ -561,6 +563,8 @@ def main() -> None:
 
     if not to_process:
         print("All recordings already have good transcripts. Use --reprocess to re-transcribe.")
+        synced = sync_copy_dir(config["notes_dir"], COPY_DIR)
+        print(f"Synced:     {synced} file(s) to COPY_DIR")
         return
 
     print(f"Will process {len(to_process)} file(s):")
