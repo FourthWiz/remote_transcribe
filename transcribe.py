@@ -373,7 +373,7 @@ def load_diarization_pipeline():
     t0 = time.time()
     pipeline = Pipeline.from_pretrained(
         "pyannote/speaker-diarization-3.1",
-        use_auth_token=os.environ["HF_TOKEN"],
+        token=os.environ["HF_TOKEN"],
     )
     if torch.backends.mps.is_available():
         pipeline.to(torch.device("mps"))

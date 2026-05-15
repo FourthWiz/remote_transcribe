@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 # run_daily.sh — called by cron to transcribe all pending meetings.
-# Logs to <script_dir>/logs/transcribe.log
+# Logs to <script_dir>/logs/transcribe.log by default.
+# Pass --log_std to print output to the terminal instead.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOG_DIR="$SCRIPT_DIR/logs"
 LOG_FILE="$LOG_DIR/transcribe.log"
 PYTHON="$SCRIPT_DIR/.venv/bin/python3"
+LOG_STD=0
+
+for arg in "$@"; do
+    [ "$arg" = "--log_std" ] && LOG_STD=1
+done
 
 mkdir -p "$LOG_DIR"
 
@@ -19,14 +25,17 @@ if [ -z "$HF_TOKEN" ] && [ -f "$HOME/.zshrc" ]; then
     HF_TOKEN=$(grep 'export HF_TOKEN=' "$HOME/.zshrc" | tail -1 | sed 's/export HF_TOKEN=//' | tr -d '"'"'" 2>/dev/null)
 fi
 
-echo "" >> "$LOG_FILE"
-echo "=== $(date '+%Y-%m-%d %H:%M:%S') — transcribing all pending ===" >> "$LOG_FILE"
+HEADER="=== $(date '+%Y-%m-%d %H:%M:%S') — transcribing all pending ==="
 
-"$PYTHON" "$SCRIPT_DIR/transcribe.py" --all >> "$LOG_FILE" 2>&1
-EXIT=$?
-
-if [ $EXIT -eq 0 ]; then
-    echo "Done." >> "$LOG_FILE"
+if [ "$LOG_STD" -eq 1 ]; then
+    echo "$HEADER"
+    "$PYTHON" "$SCRIPT_DIR/transcribe.py" --all
+    EXIT=$?
+    [ $EXIT -eq 0 ] && echo "Done." || echo "ERROR: script exited with code $EXIT"
 else
-    echo "ERROR: script exited with code $EXIT" >> "$LOG_FILE"
+    echo "" >> "$LOG_FILE"
+    echo "$HEADER" >> "$LOG_FILE"
+    "$PYTHON" "$SCRIPT_DIR/transcribe.py" --all >> "$LOG_FILE" 2>&1
+    EXIT=$?
+    [ $EXIT -eq 0 ] && echo "Done." >> "$LOG_FILE" || echo "ERROR: script exited with code $EXIT" >> "$LOG_FILE"
 fi
