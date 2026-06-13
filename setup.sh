@@ -183,9 +183,29 @@ else
 fi
 
 # ── Virtual environment ───────────────────────────────────────────────────────
+# pyannote.audio 4.x (speaker-diarization-community-1) requires Python >= 3.10.
+# Bare `python3` may be an older interpreter (e.g. a pyenv 3.8 shim), so pick the
+# newest available >= 3.10 explicitly.
+pick_python() {
+    for cand in python3.13 python3.12 python3.11 python3.10 python3; do
+        if command -v "$cand" >/dev/null 2>&1 && \
+           "$cand" -c 'import sys; sys.exit(0 if sys.version_info >= (3,10) else 1)' 2>/dev/null; then
+            command -v "$cand"
+            return 0
+        fi
+    done
+    return 1
+}
+
 echo "  Setting up .venv..."
 if [ ! -d "$VENV_DIR" ]; then
-    python3 -m venv "$VENV_DIR"
+    PYTHON_BIN="$(pick_python)" || {
+        echo "  ERROR: Python >= 3.10 is required (pyannote.audio 4.x), none found." >&2
+        echo "         Install one (e.g. 'brew install python@3.12') and re-run." >&2
+        exit 1
+    }
+    echo "  Using $("$PYTHON_BIN" --version) at $PYTHON_BIN"
+    "$PYTHON_BIN" -m venv "$VENV_DIR"
     ok ".venv created"
 else
     ok ".venv already exists"
@@ -210,16 +230,15 @@ echo "  Identifies who said what — requires a free HuggingFace token."
 echo ""
 if prompt_yn "Install pyannote.audio for speaker diarization?" "n"; then
     echo "  Installing pyannote.audio..."
-    "$VENV_PIP" install --quiet pyannote.audio
+    "$VENV_PIP" install --quiet "pyannote.audio>=4.0"
     ok "pyannote.audio installed"
     "$VENV_PY" -c "import pyannote.audio; print('  ✓ pyannote.audio import OK')"
     echo ""
     echo "  ${bold}One-time HuggingFace setup required:${reset}"
     echo "    1. Create a token:  https://huggingface.co/settings/tokens"
-    echo "    2. Accept license:  https://huggingface.co/pyannote/speaker-diarization-3.1"
-    echo "    3. Accept license:  https://huggingface.co/pyannote/segmentation-3.0"
-    echo "    4. Add to ~/.zshrc: export HF_TOKEN=hf_YOUR_TOKEN_HERE"
-    echo "    5. Then run:        source ~/.zshrc"
+    echo "    2. Accept license:  https://huggingface.co/pyannote/speaker-diarization-community-1"
+    echo "    3. Add to ~/.zshrc: export HF_TOKEN=hf_YOUR_TOKEN_HERE"
+    echo "    4. Then run:        source ~/.zshrc"
 else
     ok "Skipped (run setup.sh again to install later)"
 fi

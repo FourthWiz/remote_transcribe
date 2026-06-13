@@ -21,13 +21,17 @@ Usage:
     python3 transcribe.py --all                    # all dates
     python3 transcribe.py --model medium           # use a smaller/faster model
     python3 transcribe.py --no-diarize             # skip speaker identification
+    python3 transcribe.py --max-speakers 4         # hint speaker count (better counting)
+    python3 transcribe.py --num-speakers 2         # exact count if known
     python3 transcribe.py --reprocess              # re-transcribe even good notes
 
 Requirements (run setup.sh first):
     brew install ffmpeg
     pip3 install mlx-whisper tqdm
-    pip3 install pyannote.audio   # optional, for speaker diarization
-    export HF_TOKEN=hf_...        # required for diarization
+    pip3 install "pyannote.audio>=4.0"   # optional, for speaker diarization
+    export HF_TOKEN=hf_...               # required for diarization
+                                         # accept the license at:
+                                         # hf.co/pyannote/speaker-diarization-community-1
 """
 
 import argparse
@@ -144,6 +148,27 @@ def parse_args() -> argparse.Namespace:
         help="Skip speaker diarization",
     )
     parser.add_argument(
+        "--min-speakers",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Lower bound on number of speakers (helps speaker counting)",
+    )
+    parser.add_argument(
+        "--max-speakers",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Upper bound on number of speakers (helps speaker counting)",
+    )
+    parser.add_argument(
+        "--num-speakers",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Exact number of speakers, if known (overrides min/max)",
+    )
+    parser.add_argument(
         "--reprocess",
         action="store_true",
         help="Re-transcribe files that already have good notes",
@@ -192,6 +217,9 @@ def preflight_checks(args: argparse.Namespace) -> dict:
     config = {
         "diarize": not args.no_diarize,
         "diarize_available": False,
+        "num_speakers": args.num_speakers,
+        "min_speakers": args.min_speakers,
+        "max_speakers": args.max_speakers,
         "model": args.model,
         "meetings_dir": args.meetings_dir,
         "notes_dir": args.notes_dir,
@@ -372,7 +400,7 @@ def load_diarization_pipeline():
     print("Loading pyannote diarization pipeline...")
     t0 = time.time()
     pipeline = Pipeline.from_pretrained(
-        "pyannote/speaker-diarization-3.1",
+        "pyannote/speaker-diarization-community-1",
         token=os.environ["HF_TOKEN"],
     )
     if torch.backends.mps.is_available():
@@ -386,14 +414,32 @@ def load_diarization_pipeline():
     return pipeline
 
 
-def diarize_audio(audio_path: Path, pipeline) -> tuple[list[dict], dict]:
+def diarize_audio(
+    audio_path: Path,
+    pipeline,
+    num_speakers: int | None = None,
+    min_speakers: int | None = None,
+    max_speakers: int | None = None,
+) -> tuple[list[dict], dict]:
     """
     Run pyannote diarization on audio_path.
     Returns (speaker_segments, speaker_stats).
     speaker_segments: list of {start, end, speaker}
     speaker_stats: dict of speaker -> {duration, percentage}
+
+    Optional speaker-count hints (community-1 / pyannote.audio 4.x) improve
+    speaker counting. num_speakers pins the exact count; min/max bound it.
     """
-    diarization = pipeline(str(audio_path))
+    kwargs: dict = {}
+    if num_speakers is not None:
+        kwargs["num_speakers"] = num_speakers
+    else:
+        if min_speakers is not None:
+            kwargs["min_speakers"] = min_speakers
+        if max_speakers is not None:
+            kwargs["max_speakers"] = max_speakers
+
+    diarization = pipeline(str(audio_path), **kwargs)
 
     speaker_segments = []
     for turn, _, speaker in diarization.itertracks(yield_label=True):
@@ -605,7 +651,13 @@ def main() -> None:
             speaker_stats = None
             if diarize_pipeline is not None:
                 try:
-                    speaker_segs, speaker_stats = diarize_audio(audio_path, diarize_pipeline)
+                    speaker_segs, speaker_stats = diarize_audio(
+                        audio_path,
+                        diarize_pipeline,
+                        num_speakers=config.get("num_speakers"),
+                        min_speakers=config.get("min_speakers"),
+                        max_speakers=config.get("max_speakers"),
+                    )
                     segments = align_speakers(segments, speaker_segs)
                 except Exception as e:
                     print(f"  WARNING: Diarization failed: {e}")

@@ -5,3 +5,4 @@ __pycache__/
 logs/
 config.env
 .DS_Store
+.venv*
